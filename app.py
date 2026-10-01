@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -169,6 +170,141 @@ def interp_cat(v, g):
         t += " Ojo: uno de los grupos tiene menos de 30 empresas, así que la diferencia puede ser inestable."
     return t + " Es una asociación descriptiva, no prueba causalidad."
 
+# ---------- Gráficas adicionales (cada una con su interpretación) ----------
+@lru_cache(None)
+def effects():   # r biserial de todas las variables cuantitativas
+    return pd.Series({v: rank_biserial(v) for v in FEATS}).dropna()
+
+@lru_cache(None)
+def feat_stats():
+    return pd.DataFrame({"outliers": {v: out_pct(df[v]) for v in FEATS}, "asimetria": {v: df[v].skew() for v in FEATS}})
+
+def hbar(d, x, y, **kw):
+    d = d.copy(); d[y] = d[y].str[:45]
+    return px.bar(d, x=x, y=y, orientation="h", **kw)
+
+def ks_stat(v):
+    a, b = np.sort(df[df[TARGET] == 0][v].values), np.sort(df[df[TARGET] == 1][v].values)
+    x = np.concatenate([a, b])
+    return float(np.max(np.abs(np.searchsorted(a, x, side="right") / len(a) - np.searchsorted(b, x, side="right") / len(b))))
+
+def overview_corr():
+    a = CORR.abs()
+    fig = px.histogram(CORR.rename("r").reset_index(), x="r", nbins=30, color_discrete_sequence=["#6d5efc"])
+    fig.update_xaxes(title="Correlación con la quiebra (r)")
+    cierre = "ninguna variable sola explica la quiebra con fuerza." if a.max() < .3 else "hay variables con una asociación fuerte."
+    return graph(fig, 320, f"{int((a < .1).sum())} de las {len(a)} variables tienen |r| < 0,1 con la quiebra y {int((a >= .2).sum())} llegan a 0,2 o más: {cierre}")
+
+def panorama_uni():
+    st = feat_stats()
+    o = st["outliers"].sort_values().tail(15).rename("Outliers").rename_axis("Variable").reset_index()
+    sk = st["asimetria"].reindex(st["asimetria"].abs().sort_values().tail(15).index).rename("Asimetría").rename_axis("Variable").reset_index()
+    f1 = hbar(o, "Outliers", "Variable", color_discrete_sequence=["#f43f5e"]); f1.update_xaxes(tickformat=".0%")
+    f2 = hbar(sk, "Asimetría", "Variable", color_discrete_sequence=["#6d5efc"])
+    vo, vs = st["outliers"].idxmax(), st["asimetria"].abs().idxmax()
+    t1 = f"«{vo}» tiene {st['outliers'].max():.1%} de outliers (IQR); en {int((st['outliers'] > .1).sum())} de {len(st)} variables más del 10 % de las empresas es outlier."
+    t2 = f"«{vs}» es la más asimétrica ({st['asimetria'][vs]:+.1f}); {int((st['asimetria'].abs() > 1).sum())} variables tienen asimetría marcada (|asimetría| > 1): candidatas a transformación o winsorizing."
+    return html.Div([html.H4("Panorama de todas las variables cuantitativas"),
+                     html.Div([graph(f1, 460, t1), graph(f2, 460, t2)], className="grid2")])
+
+def panorama_bi():
+    e = effects()
+    t = e.reindex(e.abs().sort_values().tail(15).index).rename("r").rename_axis("Variable").reset_index()
+    t["Dirección"] = np.where(t["r"] > 0, "Mayor en no quebradas", "Mayor en quebradas")
+    fig = hbar(t, "r", "Variable", color="Dirección",
+               color_discrete_map={"Mayor en no quebradas": COLORS["No bancarrota"], "Mayor en quebradas": COLORS["Bancarrota"]})
+    top = e.abs().idxmax()
+    return html.Div([html.H4("Panorama: qué variables separan mejor a los grupos"),
+                     graph(fig, 460, f"«{top}» es la que más separa a los grupos (r biserial = {e[top]:+.2f}); {int((e.abs() >= .3).sum())} de {len(e)} "
+                                     "variables tienen efecto moderado o mayor (|r| ≥ 0,3). Selecciónala arriba para ver su detalle.")])
+
+def radar():
+    cols = list(BY_ABS.index[:8])
+    z = (df[cols] - df[cols].mean()) / df[cols].std()
+    zg = z.groupby(df["Estado"]).mean().T
+    g = zg.rename_axis("Variable").reset_index().melt(id_vars="Variable", var_name="Estado", value_name="z")
+    g["Variable"] = g["Variable"].str[:28]
+    fig = px.line_polar(g, r="z", theta="Variable", color="Estado", line_close=True, color_discrete_map=COLORS)
+    gap = (zg["Bancarrota"] - zg["No bancarrota"]).abs().idxmax()
+    return html.Div([html.H4("Perfil de las empresas quebradas vs. no quebradas"),
+                     graph(fig, 460, f"Cada eje es una de las 8 variables más asociadas a la quiebra, estandarizada (0 = promedio general). La mayor diferencia "
+                                     f"está en «{gap}» ({zg.loc[gap, 'Bancarrota']:+.2f} vs. {zg.loc[gap, 'No bancarrota']:+.2f} desviaciones). "
+                                     "Cuanto más separadas estén las dos líneas, más distinto es el perfil financiero de las quebradas.")])
+
+def density(x, y):
+    d = df[df[x].between(*df[x].quantile([.01, .99])) & df[y].between(*df[y].quantile([.01, .99]))]
+    fig = px.density_heatmap(d, x=x, y=y, nbinsx=40, nbinsy=40, color_continuous_scale="Purples")
+    H, xe, ye = np.histogram2d(d[x], d[y], bins=40)
+    i, j = np.unravel_index(H.argmax(), H.shape)
+    return graph(fig, 460, f"La mayor concentración de empresas está cerca de {x} ≈ {(xe[i] + xe[i + 1]) / 2:.3g} y {y} ≈ {(ye[j] + ye[j + 1]) / 2:.3g} "
+                           f"({H.max() / H.sum():.1%} de las empresas en esa celda). Se recortó el 1 % extremo de cada variable.")
+
+def quartile_chart():
+    cols, rows = list(BY_ABS.index[:3]), []
+    for v in cols:
+        q = pd.qcut(df[v].rank(method="first"), 4, labels=["Q1 (más bajo)", "Q2", "Q3", "Q4 (más alto)"])
+        rows += [(v[:30], k, x) for k, x in df.groupby(q, observed=True)[TARGET].mean().items()]
+    d = pd.DataFrame(rows, columns=["Variable", "Cuartil", "Tasa"])
+    fig = px.bar(d, x="Cuartil", y="Tasa", color="Variable", barmode="group", color_discrete_sequence=["#6d5efc", "#f43f5e", "#fdab3d"])
+    fig.update_yaxes(tickformat=".0%", title="Tasa de bancarrota")
+    r0 = d[d["Variable"] == cols[0][:30]]["Tasa"].values
+    return graph(fig, 420, f"En «{cols[0]}» la tasa de quiebra va de {r0[0]:.1%} (cuartil más bajo) a {r0[-1]:.1%} (más alto). Si la tasa sube o baja "
+                           "de forma escalonada entre cuartiles, la relación es monótona y la variable sirve para ordenar empresas por riesgo.")
+
+def effect_vs_outliers():
+    e, st = effects(), feat_stats()
+    d = pd.DataFrame({"Variable": e.index, "Efecto": e.abs().values, "Outliers": st["outliers"].reindex(e.index).values})
+    fig = px.scatter(d, x="Outliers", y="Efecto", hover_name="Variable", color_discrete_sequence=["#6d5efc"])
+    fig.update_xaxes(tickformat=".0%"); fig.update_yaxes(title="|r biserial|")
+    n = int(((d["Efecto"] >= .3) & (d["Outliers"] > .1)).sum())
+    t = (f"{n} variables combinan efecto moderado (≥ 0,3) con más de 10 % de outliers: son de las más útiles, pero piden cuidado al transformarlas."
+         if n else "Ninguna variable combina efecto moderado (≥ 0,3) con más de 10 % de outliers.")
+    return graph(fig, 420, "Cada punto es una variable: arriba separa mejor a los grupos y a la derecha tiene más outliers. " + t)
+
+@lru_cache(None)
+def top_pairs():
+    c = df[FEATS].corr().abs(); i, j = np.triu_indices_from(c, k=1)
+    p = pd.DataFrame({"a": c.index[i], "b": c.columns[j], "r": c.values[i, j]}).dropna().sort_values("r", ascending=False).head(10)
+    p["Par"] = p["a"].str.slice(0, 24) + " ↔ " + p["b"].str.slice(0, 24)
+    return p[::-1]
+
+def pairs_graph():
+    p = top_pairs()
+    fig = px.bar(p, x="r", y="Par", orientation="h", color_discrete_sequence=["#6d5efc"])
+    fig.update_xaxes(title="|r| entre pares de variables (top 10)"); fig.update_yaxes(title="")
+    return graph(fig, 420, f"Los pares más correlacionados llegan a |r| = {p['r'].max():.2f}: miden casi lo mismo (multicolinealidad). "
+                           "Para un modelo lineal conviene dejar una sola variable por familia.")
+
+@lru_cache(None)
+def pca():
+    X = df[FEATS].apply(lambda s: s.clip(*s.quantile([.01, .99])))
+    Z = ((X - X.mean()) / X.std().replace(0, 1)).fillna(0).values
+    U, S, _ = np.linalg.svd(Z, full_matrices=False)
+    pcs = pd.DataFrame(U[:, :2] * S[:2], columns=["PC1", "PC2"]); pcs["Estado"] = df["Estado"].values
+    return pcs, S ** 2 / np.sum(S ** 2)
+
+def pca_graph():
+    pcs, var = pca()
+    m = pcs.groupby("Estado")["PC1"].median(); iqr = pcs["PC1"].quantile(.75) - pcs["PC1"].quantile(.25)
+    sep = abs(m.get("Bancarrota", 0) - m.get("No bancarrota", 0)) / iqr
+    t = (f"PC1 y PC2 resumen {var[:2].sum():.0%} de la varianza de las {len(FEATS)} variables. " +
+         ("Las quebradas quedan mezcladas con las sanas: las clases no se separan bien en 2D, lo que sugiere probar modelos que capten relaciones complejas (por ejemplo, de árboles)."
+          if sep < .3 else "Las quebradas se desplazan respecto a las sanas, pero con traslape: hay señal, no una separación limpia."))
+    fig = px.scatter(pcs, x="PC1", y="PC2", color="Estado", color_discrete_map=COLORS, opacity=.5)
+    return graph(fig, 420, t)
+
+def matrix_graph():
+    cols = list(BY_ABS.index[:4])
+    d = df.sample(min(len(df), 1500), random_state=0)
+    fig = px.scatter_matrix(d, dimensions=cols, color="Estado", color_discrete_map=COLORS, opacity=.5,
+                            labels={c: c[:16] for c in cols})
+    fig.update_traces(diagonal_visible=False, marker_size=3)
+    c = df[cols].corr().abs().values[np.triu_indices(4, k=1)]
+    return html.Div([html.H4("Las 4 variables más asociadas a la quiebra, cruzadas de a dos"),
+                     graph(fig, 620, f"Entre estas variables la correlación media es |r| = {c.mean():.2f}. Si los puntos rojos aparecen en zonas "
+                                     "distintas (colas o esquinas) en varios paneles, esas variables aportan señal conjunta; si se mezclan "
+                                     "con los azules, ninguna combinación de a dos separa bien a los grupos.")])
+
 # ---------- Secciones ----------
 def overview():
     counts = df["Estado"].value_counts().rename_axis("Estado").reset_index(name="n")
@@ -196,15 +332,16 @@ def overview():
         html.Div([graph(fig, 340, interp_balance()),
                   html.Div([html.H4("Muestra de datos"), table(df[[TARGET] + FEATS[:6]].head(8))], className="card")],
                  className="grid2"),
+        overview_corr(),
     ])
 
 def uni():
     return html.Div([head("Univariado", "¿Cómo se distribuye esta variable?"),
-                     selector("uv"), html.Div(id="uv-out")])
+                     selector("uv"), html.Div(id="uv-out"), panorama_uni()])
 
 def bi():
     return html.Div([head("Bivariado", "¿Qué cambia entre bancarrota y no bancarrota?"),
-                     selector("bv"), html.Div(id="bv-out")])
+                     selector("bv"), html.Div(id="bv-out"), panorama_bi()])
 
 def multi():
     return html.Div([
@@ -217,6 +354,9 @@ def multi():
                   html.Div([html.Label("Eje Y"), picker("mv-y", FEATS[min(1, len(FEATS) - 1)])])],
                  className="grid2 card"),
         html.Div(id="mv-sc"),
+        radar(),
+        html.Div([pairs_graph(), pca_graph()], className="grid2"),
+        matrix_graph(),
     ])
 
 def insights():
@@ -234,6 +374,7 @@ def insights():
             kpi("Desbalance", f"1 de cada {round(1 / b) if b else '—'} quebró"),
         ], className="grid3"),
         graph(fig, 420, interp_top()),
+        html.Div([quartile_chart(), effect_vs_outliers()], className="grid2"),
     ])
 
 def explorer():
@@ -317,8 +458,12 @@ def on_uni(v):
     s = df[v].describe()   # cuantitativa: histograma + boxplot
     stats = {"Media": s["mean"], "Desv. estándar": s["std"], "Mínimo": s["min"], "Mediana": s["50%"], "Máximo": s["max"]}
     fig = px.histogram(clip(v), x=v, nbins=50, marginal="box", color_discrete_sequence=["#6d5efc"])
+    ec = px.ecdf(clip(v), x=v, color_discrete_sequence=["#6d5efc"])
+    q = df[v].quantile([.1, .5, .9])
+    t = (f"La mitad de las empresas tiene {v} ≤ {q[.5]:.4g}; el 10 % más bajo llega a {q[.1]:.4g} y el 90 % a {q[.9]:.4g}. "
+         "Sirve para leer percentiles: una curva muy empinada indica valores concentrados en un rango estrecho.")
     return html.Div([html.Div([kpi(k, f"{x:.4g}") for k, x in stats.items()], className="grid5"),
-                     graph(fig, 420, interp_dist(v))])
+                     html.Div([graph(fig, 420, interp_dist(v)), graph(ec, 420, t)], className="grid2")])
 
 @app.callback(Output("bv-out", "children"), Input("bv", "value"))
 def on_bi(v):
@@ -328,17 +473,37 @@ def on_bi(v):
         fig = px.bar(g, x=v, y="tasa", text=g["tasa"].map("{:.2%}".format), color_discrete_sequence=["#f43f5e"])
         fig.update_yaxes(title="Tasa de bancarrota", tickformat=".0%")
         fig.update_xaxes(type="category")
+        ct = df.groupby([v, "Estado"]).size().reset_index(name="n")
+        ct[v] = ct[v].astype(str)
+        fig2 = px.bar(ct, x=v, y="n", color="Estado", barmode="group", log_y=True, color_discrete_map=COLORS)
+        pv = ct.pivot(index=v, columns="Estado", values="n").fillna(0).astype(int)
+        t2 = ("Conteos por categoría (escala logarítmica, porque las quebradas son pocas): " +
+              "; ".join(f"{v} = {i}: {r.get('No bancarrota', 0):,} sanas y {r.get('Bancarrota', 0):,} quebradas" for i, r in pv.iterrows()) + ".")
         return html.Div([html.Div([kpi(f"{v} = {r[v]}", f"{r['n']:,} empresas · {r['tasa']:.2%} quebró")
                                    for _, r in g.iterrows()], className="grid2"),
-                         graph(fig, 340, interp_cat(v, g))])
+                         html.Div([graph(fig, 340, interp_cat(v, g)), graph(fig2, 340, t2)], className="grid2")])
     d = clip(v)   # cuantitativa: boxplot + histograma por estado
     box = px.box(d, x="Estado", y=v, color="Estado", color_discrete_map=COLORS)
     hist = px.histogram(d, x=v, color="Estado", barmode="overlay", opacity=.6, nbins=50,
                         histnorm="probability density", color_discrete_map=COLORS)
     m = df.groupby("Estado")[v].median()
     kp = [kpi(f"Mediana · {k}", f"{x:.4g}") for k, x in m.items()] + [kpi("r biserial (tamaño de efecto)", f"{rank_biserial(v):+.2f}")]
+    ec = px.ecdf(d, x=v, color="Estado", color_discrete_map=COLORS)
+    pq = df.groupby("Estado")[v].quantile([.1, .25, .5, .75, .9]).reset_index()
+    pq.columns = ["Estado", "p", "valor"]
+    pq["p"] = (pq["p"] * 100).astype(int).astype(str) + "%"
+    pb = px.bar(pq, x="p", y="valor", color="Estado", barmode="group", color_discrete_map=COLORS)
+    pb.update_xaxes(title="Percentil", categoryorder="array", categoryarray=["10%", "25%", "50%", "75%", "90%"])
+    pv = pq.pivot(index="p", columns="Estado", values="valor")
+    if (pv["Bancarrota"] < pv["No bancarrota"]).all() or (pv["Bancarrota"] > pv["No bancarrota"]).all():
+        tp = f"Las quebradas están por {'debajo' if (pv['Bancarrota'] < pv['No bancarrota']).all() else 'encima'} en todos los percentiles: la diferencia es consistente a lo largo de la distribución."
+    else:
+        tp = "El orden entre grupos cambia según el percentil: la diferencia no es uniforme, conviene mirar también las colas."
+    te = (f"La distancia máxima entre las dos curvas (KS) es {ks_stat(v):.2f}: 0 = distribuciones idénticas, 1 = separación total. "
+          "Cuanto mayor, mejor distingue la variable a los grupos.")
     return html.Div([html.Div(kp, className="grid3"),
-                     html.Div([graph(box, 380, interp_box(v)), graph(hist, 380, interp_hist(v))], className="grid2")])
+                     html.Div([graph(box, 380, interp_box(v)), graph(hist, 380, interp_hist(v))], className="grid2"),
+                     html.Div([graph(ec, 380, te), graph(pb, 380, tp)], className="grid2")])
 
 @app.callback(Output("mv-heat", "children"), Input("mv-n", "value"))
 def on_heat(n):
@@ -351,7 +516,7 @@ def on_heat(n):
 def on_scatter(x, y):
     d = df.sample(min(len(df), 2000), random_state=0)
     fig = px.scatter(d, x=x, y=y, color="Estado", color_discrete_map=COLORS, opacity=.6)
-    return graph(fig, 460, interp_scatter(x, y))
+    return html.Div([graph(fig, 460, interp_scatter(x, y)), density(x, y)], className="grid2")
 
 @app.callback(Output("ex-tbl", "data"), Output("ex-tbl", "columns"), Input("ex-cols", "value"))
 def on_cols(cols):
