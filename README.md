@@ -47,8 +47,8 @@ Siga los siguientes pasos en Anaconda PowerShell Promt:
 1. **Clona el repositorio**
 
    ```bash
-   git clone https://github.com/lauraformore/BancarrotaEmpresarial_VIZ.git
-   cd BancarrotaEmpresarial_VIZ
+   git clone https://github.com/lauraformore/DASH_VIZ.git
+   cd DASH_VIZ
    ```
 
 2. **Crea un entorno** (se probó con Python 3.11)
