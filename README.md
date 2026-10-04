@@ -45,7 +45,7 @@ dash_bancarrota/
 ```
 
 ## Instalación y ejecución local
-
+Siga los siguientes pasos en Anaconda PowerShell Promt:
 1. **Clona el repositorio**
 
    ```bash
