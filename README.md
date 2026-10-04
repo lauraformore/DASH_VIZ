@@ -64,9 +64,7 @@ Siga los siguientes pasos en Anaconda PowerShell Promt:
    pip install -r requirements.txt
    ```
 
-4. **Agrega los datos.** Descarga `data.csv` desde [Kaggle](https://www.kaggle.com/datasets/fedesoriano/company-bankruptcy-prediction) o [UCI](https://archive.ics.uci.edu/dataset/572/taiwanese+bankruptcy+prediction) y guárdalo en `data/data.csv`. La columna objetivo debe llamarse `Bankrupt?` (si usas otro nombre, cambia `TARGET` al inicio de `app.py`). Sin este archivo, la app corre con datos de demostración.
-
-5. **Ejecuta**
+4. **Ejecuta**
 
    ```bash
    python app.py
