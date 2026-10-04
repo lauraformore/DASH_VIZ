@@ -10,8 +10,6 @@ Proyecto de la asignatura **Visualización de Datos**, Departamento de Matemáti
 
 Anticipar el riesgo de quiebra de una empresa permite a inversionistas, entidades financieras y gerencia actuar antes de que sea inminente. Este proyecto usa el dataset del **Taiwan Economic Journal**: 6.819 empresas que cotizaron en la Bolsa de Taiwán entre 1999 y 2009, descritas por 95 ratios financieros (rentabilidad, liquidez, endeudamiento, eficiencia operativa, entre otros) y una variable binaria (`Bankrupt?`) que indica si terminaron en bancarrota.
 
-Flujo de trabajo: **EDA → preprocesamiento → modelos de clasificación binaria → dashboard**.
-
 ## Secciones del dashboard
 
 El menú vertical responde una pregunta en cada sección:
