@@ -62,7 +62,6 @@ Siga los siguientes pasos en Anaconda PowerShell Promt:
 
    ```bash
    pip install -r requirements.txt
-   python -m pip install "dash-bootstrap-components>=1.6,<2"
    ```
 
 4. **Ejecuta**
