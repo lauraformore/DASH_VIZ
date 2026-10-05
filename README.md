@@ -81,14 +81,22 @@ Siga los siguientes pasos en Anaconda PowerShell Promt:
 
 ## Despliegue en Render
 
-1. Sube el repositorio a GitHub (incluye `data/data.csv` si el repo es privado, o cárgalo de otra forma).
-2. En Render crea un **Web Service** conectado al repositorio.
-3. Configura:
-   - **Build command:** `pip install -r requirements.txt`
-   - **Start command:** `gunicorn app:server`
-4. En el plan gratuito la app se "duerme" tras un rato sin visitas, así que la primera carga puede tardar.
+El dashboard se encuentra desplegado y accesible públicamente en el siguiente enlace:
+👉 **[Ver Dashboard en Vivo](https://company-bankruptcy-prediction-dash.onrender.com/)** 
 
-Antes de publicar, cambia `app.run(debug=True)` a `app.run(debug=False)` para ocultar el menú de depuración de Dash.
+### Pasos para replicar el despliegue en Render:
+
+1. **Repositorio:** Vincula el repositorio de GitHub a tu cuenta de [Render](https://render.com/).
+2. **Crear Web Service:** Selecciona la opción **Build and deploy from a Git repository** y elige `DASH_VIZ`.
+3. **Configuración del servicio:**
+   - **Environment / Runtime:** `Python 3`
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `gunicorn app:server`
+   - **Plan:** Free
+
+> **Nota sobre el entorno:** 
+> - En el plan gratuito de Render, la aplicación entra en modo reposo tras 15 minutos de inactividad, por lo que la primera carga puede demorar alrededor de 30 a 50 segundos.
+> - En producción local, asegúrate de mantener `debug=False` en `app.run_server(debug=False)` dentro de `app.py`.
 
 ## Metodología (resumen del EDA)
 
