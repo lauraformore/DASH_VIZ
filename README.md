@@ -8,7 +8,7 @@ Proyecto de la asignatura **Visualización de Datos**, Departamento de Matemáti
 
 ## Contexto
 
-Anticipar el riesgo de quiebra de una empresa permite a inversionistas, entidades financieras y gerencia actuar antes de que sea inminente. Este proyecto usa el dataset del **Taiwan Economic Journal**: 6.819 empresas que cotizaron en la Bolsa de Taiwán entre 1999 y 2009, descritas por 95 ratios financieros (rentabilidad, liquidez, endeudamiento, eficiencia operativa, entre otros) y una variable binaria (`Bankrupt?`) que indica si terminaron en bancarrota.
+Anticipar el riesgo de quiebra de una empresa permite a inversionistas, entidades financieras y gerencia actuar antes de que sea inminente. Este proyecto usa el dataset del **Taiwan Economic Journal**: 6.819 observaciones de empresas correspondientes al periodo 1999–2009, descritas por 95 variables financieras (ratios de rentabilidad, liquidez, endeudamiento, eficiencia operativa e indicadores binarios) y una variable objetivo (`Bankrupt?`) que indica si terminaron en bancarrota.
 
 ## Secciones del dashboard
 
@@ -16,34 +16,38 @@ El menú vertical responde una pregunta en cada sección:
 
 | Sección | Pregunta | Contenido |
 |---|---|---|
-| **Overview** | ¿Qué empresas estoy viendo? | Contexto del proyecto, KPIs, dona de clases, muestra de datos, histograma de correlaciones con la quiebra |
-| **Univariado** | ¿Cómo se distribuye esta variable? | Histograma + boxplot (cuantitativas), dona + barras (cualitativas), panorama de outliers y asimetría |
-| **Bivariado** | ¿Qué cambia entre bancarrota y no bancarrota? | Boxplot e histograma por estado, tasa de bancarrota por categoría, ranking de variables que mejor separan a los grupos |
-| **Multivariado** | ¿Cómo se relacionan las variables? | Heatmap de correlación, scatter con ejes a elegir, radar de perfiles, pares más correlacionados, PCA en 2D, matriz de dispersión |
-| **Insights** | ¿Qué descubrimos? | Top 10 de correlaciones, tasa de quiebra por cuartiles, efecto frente a outliers |
+| **Overview** | ¿Qué empresas estoy viendo? | Contexto del proyecto, objetivos y metodología, KPIs, dona de balance de clases y muestra de datos |
+| **Univariado** | ¿Cómo se distribuye esta variable? | Histograma + boxplot y estadísticas descriptivas (cuantitativas), conteos y barras con porcentajes (cualitativas), panorama de outliers IQR y asimetría |
+| **Bivariado** | ¿Qué cambia entre bancarrota y no bancarrota? | Boxplot por estado, tabla de estadísticas descriptivas (N, media, DS, mediana, mínimo, máximo, Q1, Q3 e IQR), prueba U de Mann-Whitney y tamaño de efecto r biserial; barras agrupadas con porcentajes y conteos por categoría, prueba exacta de Fisher y ranking de variables que mejor separan a los grupos |
+| **Multivariado** | ¿Cómo se relacionan las variables? | Heatmap de correlación, scatter y mapa de densidad con ejes a elegir, pares más correlacionados, PCA en 2D y matriz de dispersión |
+| **Insights** | ¿Qué descubrimos? | Radar de perfiles de empresas quebradas y solventes, tabla de síntesis por siete aspectos del EDA y ocho conclusiones numeradas con hallazgos estadísticos y recomendaciones preliminares para modelado |
 | **Data Explorer** | ¿Quiero investigar por mi cuenta? | Tabla con filtros, orden, selección de columnas y descarga en CSV |
 
 Otras características:
 
 - **Modo noche / modo claro**, con interruptor en la barra lateral (se recuerda entre visitas).
-- **Variables cuantitativas y cualitativas separadas**: los flags 0/1 (`Liability-Assets Flag`, `Net Income Flag`) se analizan con gráficas distintas a las de los ratios.
+- **Variables cuantitativas y cualitativas separadas**: los flags 0/1 (`Liability-Assets Flag`, `Net Income Flag`) se analizan con gráficas y pruebas estadísticas distintas a las de los ratios.
 - **Interpretación automática** debajo de cada gráfica, calculada con los datos de la variable elegida.
+- **Ayuda contextual** mediante tooltips y botones `(i)` con explicaciones de los gráficos, pruebas estadísticas y limitaciones de interpretación.
+- **Síntesis ejecutiva del EDA** con cifras calculadas a partir del dataset y recomendaciones sobre desbalance, valores extremos, multicolinealidad y validación sin fuga de información.
 
 ## Estructura del proyecto
 
-```
+```text
 dash_bancarrota/
-├── app.py              # aplicación Dash (datos, gráficas, callbacks)
+├── app.py              # aplicación Dash (datos, gráficas, pruebas estadísticas y callbacks)
 ├── assets/
-│   └── style.css       # tema claro/oscuro y estilos del menú
+│   └── style.css       # tema claro/oscuro, estilos del menú, tablas y conclusiones
 ├── data/
-│   └── data.csv        # dataset (no incluido, ver más abajo)
+│   └── data.csv        # dataset utilizado por el dashboard
 ├── requirements.txt
 └── README.md
 ```
 
 ## Instalación y ejecución local
-Siga los siguientes pasos en Anaconda PowerShell Promt:
+
+Siga los siguientes pasos en Anaconda PowerShell Prompt:
+
 1. **Clona el repositorio**
 
    ```bash
@@ -61,7 +65,7 @@ Siga los siguientes pasos en Anaconda PowerShell Promt:
 3. **Instala las dependencias**
 
    ```bash
-   pip install -r requirements.txt
+   python -m pip install -r requirements.txt
    ```
 
 4. **Ejecuta**
@@ -74,14 +78,15 @@ Siga los siguientes pasos en Anaconda PowerShell Promt:
 
 ### Dependencias
 
-`dash>=2.18,<3`, `plotly`, `pandas`, `numpy` y `gunicorn` (solo para despliegue).
+`dash>=2.18,<3`, `dash-bootstrap-components>=1.6.0,<2.0.0`, `plotly`, `pandas`, `numpy` y `gunicorn` (solo para despliegue).
 
 > **Nota (Windows):** si Windows bloquea algún archivo de pandas (error *"Una directiva de Control de aplicaciones bloqueó este archivo"*), instala versiones anteriores: `pip install "pandas==2.2.3" "numpy<2"`.
 
 ## Despliegue en Render
 
 El dashboard se encuentra desplegado y accesible públicamente en el siguiente enlace:
-👉 **[Ver Dashboard en Vivo](https://company-bankruptcy-prediction-dash.onrender.com/)** 
+
+**[Dashboard Company Bankruptcy prediction](https://company-bankruptcy-prediction-dash.onrender.com/)**
 
 ### Pasos para replicar el despliegue en Render:
 
@@ -93,17 +98,19 @@ El dashboard se encuentra desplegado y accesible públicamente en el siguiente e
    - **Start Command:** `gunicorn app:server`
    - **Plan:** Free
 
-> **Nota sobre el entorno:** 
-> - En el plan gratuito de Render, la aplicación entra en modo reposo tras 15 minutos de inactividad, por lo que la primera carga puede demorar alrededor de 30 a 50 segundos.
-> - En producción local, asegúrate de mantener `debug=False` en `app.run_server(debug=False)` dentro de `app.py`.
+> **Nota sobre el entorno:**
+> - En el plan gratuito de Render, la aplicación entra en modo reposo tras 15 minutos de inactividad; la reactivación puede tardar aproximadamente un minuto, según la [documentación de Render](https://render.com/docs/free).
+> - Para una ejecución local sin modo de depuración, utiliza `app.run(debug=False)` dentro de `app.py`. En Render, el servicio se inicia mediante `gunicorn app:server`.
 
 ## Metodología (resumen del EDA)
 
-- Separación **train/test** estratificada antes del análisis, para evitar *data leakage*.
-- Revisión de calidad: nulos, duplicados y variables constantes.
-- Desbalance de clases: la bancarrota es una clase minoritaria, por lo que se recomienda evaluar con *recall*, F1 o AUC-PR.
-- Tamaño de efecto con **r biserial de rangos** y correlaciones de Spearman/Pearson para distinguir variables relevantes.
-- Identificación de **multicolinealidad** entre ratios casi equivalentes.
+- Exploración descriptiva sobre la **muestra completa**. Para la etapa de modelado se recomienda separación **train/test** y validación cruzada estratificada (`StratifiedKFold`), ajustando el preprocesamiento exclusivamente dentro de cada fold de entrenamiento para evitar *data leakage*.
+- Revisión de calidad: valores nulos, variables constantes y extremos mediante la regla **IQR**. Los outliers no se eliminan automáticamente; se recomienda evaluar su origen y comparar winsorización, transformaciones o escalado robusto.
+- Desbalance de clases: la bancarrota es una clase minoritaria (**220 de 6.819 empresas; 3,23 %**). Se recomienda evaluar con **Recall, F1-Score, AUC-ROC y AUC-PR**, evitando Accuracy como criterio principal.
+- Asociación cuantitativa mediante **U de Mann-Whitney**, **r biserial de rangos** y correlaciones de **Pearson**. Los p-valores se interpretan junto con el tamaño de efecto y las distribuciones; en Insights se advierte que no están ajustados por comparaciones múltiples.
+- Asociación categórica mediante la **prueba exacta de Fisher**, odds ratio e intervalo de confianza cuando corresponde. Se considera la escasa frecuencia de `Liability-Assets Flag = 1` y la varianza cero de `Net Income Flag`.
+- Identificación de **multicolinealidad** entre ratios casi equivalentes mediante matrices de correlación, pares correlacionados y PCA; se recomienda evaluar regularización L1/L2, selección de características o reducción de dimensionalidad.
+- Síntesis de resultados en **Insights**, distinguiendo asociaciones exploratorias de capacidad predictiva: ningún p-valor ni tamaño de efecto garantiza rendimiento fuera de la muestra.
 
 ## Enlaces
 
